@@ -1,0 +1,118 @@
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: coachhub-traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.baseball.address=:7373"
+      # Metrics
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addRoutersLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
+      # Access Logs
+      - "--accesslog=true"
+      - "--accesslog.format=json"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--accesslog.bufferingsize=100"
+      # Logs
+      - "--log=true"
+      - "--log.level=INFO"
+      - "--log.format=json"
+      - "--log.filepath=/var/log/traefik/traefik.log"
+      # Health Check
+      - "--ping=true"
+      - "--ping.entrypoint=ping"
+      - "--entrypoints.ping.address=:8082"
+    ports:
+      - "7373:7373"    # Main application port (BASEBALL on phone keypad)
+      - "9090:8080"    # Traefik dashboard on uncommon port
+      - "8082:8082"    # Health check endpoint
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_logs:/var/log/traefik
+    networks:
+      - coachhub
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: coachhub-app
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-true}
+      - REDIS_URL=${REDIS_URL}
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
+      - NODE_ENV=${NODE_ENV:-production}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.coachhub.rule=Host(`localhost`) || Host(`coach.z-q.me`) || Host(`coach.z-q.me`)"
+      - "traefik.http.routers.coachhub.entrypoints=baseball"
+      - "traefik.http.routers.coachhub.service=coachhub"
+      - "traefik.http.services.coachhub.loadbalancer.server.port=3000"
+    networks:
+      - coachhub
+
+  db:
+    image: postgres:16-alpine
+    container_name: coachhub-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=coachhub
+      - POSTGRES_USER=coach
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coach -d coachhub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - coachhub
+
+  redis:
+    image: redis:7-alpine
+    container_name: coachhub-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - coachhub
+
+volumes:
+  pg_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads:
+    driver: local
+  traefik_logs:
+    driver: local
+
+networks:
+  coachhub:
+    driver: bridge

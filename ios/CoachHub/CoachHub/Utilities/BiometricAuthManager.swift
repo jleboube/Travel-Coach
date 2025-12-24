@@ -17,6 +17,7 @@ class BiometricAuthManager {
         case none
         case faceID
         case touchID
+        case opticID
     }
 
     enum BiometricError: Error {
@@ -66,6 +67,8 @@ class BiometricAuthManager {
             return .faceID
         case .touchID:
             return .touchID
+        case .opticID:
+            return .opticID
         case .none:
             return .none
         @unknown default:

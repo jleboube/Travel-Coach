@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/auth"
+import { getAuthUser } from "@/lib/auth-helper"
 import { db } from "@/lib/db"
 import { z } from "zod"
 
@@ -11,13 +11,13 @@ const invitationSchema = z.object({
 // GET - List all invitations (HEAD_COACH only)
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
+    const user = await getAuthUser(request)
 
-    if (!session || !session.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    if (session.user.role !== "HEAD_COACH") {
+    if (user.role !== "HEAD_COACH") {
       return NextResponse.json(
         { error: "Only head coaches can view invitations" },
         { status: 403 }
@@ -53,13 +53,13 @@ export async function GET(request: NextRequest) {
 // POST - Create a new invitation (HEAD_COACH only)
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
+    const user = await getAuthUser(request)
 
-    if (!session || !session.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    if (session.user.role !== "HEAD_COACH") {
+    if (user.role !== "HEAD_COACH") {
       return NextResponse.json(
         { error: "Only head coaches can send invitations" },
         { status: 403 }
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         email,
         role,
         expiresAt,
-        invitedBy: session.user.id,
+        invitedBy: user.id,
       },
       include: {
         inviter: {

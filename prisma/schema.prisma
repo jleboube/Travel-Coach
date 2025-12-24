@@ -18,11 +18,13 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  announcements Announcement[]
-  messages      Message[]
+  accounts        Account[]
+  sessions        Session[]
+  announcements   Announcement[]
+  messages        Message[]
   sentInvitations Invitation[] @relation("InvitationSender")
+  teamMemberships TeamMember[]
+  deviceTokens    DeviceToken[]
 
   @@map("users")
 }
@@ -92,11 +94,35 @@ model Player {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  stats         PlayerStat[]
-  gameStats     GamePlayerStat[]
-  customMetrics CustomMetric[]
+  stats              PlayerStat[]
+  gameStats          GamePlayerStat[]
+  customMetrics      CustomMetric[]
+  performanceMetrics PerformanceMetric[]
 
   @@map("players")
+}
+
+// Performance metrics with history tracking (exit velo, pulldown velo, 60 yard sprint)
+model PerformanceMetric {
+  id        String            @id @default(cuid())
+  playerId  String
+  type      PerformanceType
+  value     Float
+  unit      String            // mph, seconds, etc.
+  date      DateTime          @default(now())
+  notes     String?
+  createdAt DateTime          @default(now())
+
+  player    Player            @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, type, date])
+  @@map("performance_metrics")
+}
+
+enum PerformanceType {
+  EXIT_VELOCITY
+  PULLDOWN_VELOCITY
+  SIXTY_YARD_SPRINT
 }
 
 model PlayerStat {
@@ -373,6 +399,42 @@ model Message {
   @@map("messages")
 }
 
+model Team {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  season    String
+  joinCode  String   @unique @default(cuid())
+  logoUrl   String?
+  colors    String[]
+  ageGroup  String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   TeamMember[]
+
+  @@index([joinCode])
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@index([teamId])
+  @@map("team_members")
+}
+
+// DEPRECATED: Keeping for backward compatibility during migration
 model TeamConfig {
   id        String   @id @default(cuid())
   teamName  String
@@ -465,4 +527,37 @@ enum WorkoutFocus {
   AGILITY
   MENTAL
   TEAM_BUILDING
+}
+
+// Push notification device tokens
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String
+  platform  String   // "ios" or "android"
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, token])
+  @@index([userId])
+  @@index([token])
+  @@map("device_tokens")
+}
+
+// Scheduled notification jobs for tracking
+model ScheduledNotification {
+  id            String   @id @default(cuid())
+  type          String   // "event_reminder", "tournament_travel", "announcement"
+  referenceId   String   // eventId, tournamentId, or announcementId
+  scheduledFor  DateTime
+  sent          Boolean  @default(false)
+  sentAt        DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([scheduledFor, sent])
+  @@index([referenceId])
+  @@map("scheduled_notifications")
 }

@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server"
-import { auth } from "@/auth"
-
+import { NextRequest, NextResponse } from "next/server"
+import { getAuthUser } from "@/lib/auth-helper"
 import { db } from "@/lib/db"
+import { scheduleTournamentTravelReminder } from "@/lib/jobs/queue"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
+    const user = await getAuthUser(request)
 
-    if (!session) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -36,11 +36,11 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
+    const user = await getAuthUser(request)
 
-    if (!session) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -117,6 +117,14 @@ export async function POST(request: Request) {
           allDay: false,
         },
       })
+    }
+
+    // Schedule travel booking reminder (90 days before tournament)
+    try {
+      await scheduleTournamentTravelReminder(tournament.id, tournament.startDate)
+    } catch (err) {
+      // Log but don't fail the request if notification scheduling fails
+      console.error("Failed to schedule tournament travel reminder:", err)
     }
 
     return NextResponse.json(tournament, { status: 201 })

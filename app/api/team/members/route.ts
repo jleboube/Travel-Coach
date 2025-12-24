@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/auth"
+import { getAuthUser } from "@/lib/auth-helper"
 import { db } from "@/lib/db"
 
 // GET - List all team members (authenticated users only)
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
+    const user = await getAuthUser(request)
 
-    if (!session || !session.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

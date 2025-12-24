@@ -31,4 +31,32 @@ class PlayerService {
     func fetchPlayerStats(playerId: String, season: String) async throws -> PlayerStat {
         try await client.get("/players/\(playerId)/stats?season=\(season)")
     }
+
+    // MARK: - Performance Metrics
+
+    func fetchPerformanceMetrics(playerId: String, type: String? = nil) async throws -> PerformanceMetricsResponse {
+        var endpoint = "/players/\(playerId)/metrics"
+        if let type = type {
+            endpoint += "?type=\(type)"
+        }
+        return try await client.get(endpoint)
+    }
+
+    func addPerformanceMetric(
+        playerId: String,
+        type: String,
+        value: Double,
+        unit: String? = nil,
+        date: Date? = nil,
+        notes: String? = nil
+    ) async throws -> PerformanceMetric {
+        let request = CreatePerformanceMetricRequest(
+            type: type,
+            value: value,
+            unit: unit,
+            date: date,
+            notes: notes
+        )
+        return try await client.post("/players/\(playerId)/metrics", body: request)
+    }
 }

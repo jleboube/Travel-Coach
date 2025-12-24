@@ -23,12 +23,36 @@ class APIClient {
 
         // Configure decoder
         self.decoder = JSONDecoder()
-        self.decoder.keyDecodingStrategy = .convertFromSnakeCase
-        self.decoder.dateDecodingStrategy = .iso8601
+        // Backend sends camelCase, so no conversion needed
+
+        // Configure ISO8601 date decoding with fractional seconds support
+        self.decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+
+            // Create formatter inside closure to avoid Sendable issues
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+
+            // Fallback without fractional seconds
+            formatter.formatOptions = [.withInternetDateTime]
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Cannot decode date from: \(dateString)"
+            )
+        }
 
         // Configure encoder
         self.encoder = JSONEncoder()
-        self.encoder.keyEncodingStrategy = .convertToSnakeCase
+        // Keep camelCase for encoding to match backend expectations
         self.encoder.dateEncodingStrategy = .iso8601
     }
 

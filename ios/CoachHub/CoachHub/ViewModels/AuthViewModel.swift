@@ -35,6 +35,8 @@ class AuthViewModel: ObservableObject {
             return "Use Face ID"
         case .touchID:
             return "Use Touch ID"
+        case .opticID:
+            return "Use Optic ID"
         case .none:
             return "Biometric not available"
         }

@@ -1,4 +1,4 @@
-import { JWTVerifyResult, jwtVerify, importSPKI } from "jose"
+import { JWTVerifyResult, jwtVerify, importJWK } from "jose"
 
 export interface AppleUser {
   sub: string // User's unique Apple ID
@@ -30,8 +30,8 @@ export class AppleAuthService {
         throw new Error("No matching key found")
       }
 
-      // Convert JWK to PEM format for verification
-      const publicKey = await this.jwkToPEM(key)
+      // Import JWK directly (no PEM conversion needed!)
+      const publicKey = await importJWK(key, key.alg)
 
       // Verify the token
       const { payload } = (await jwtVerify(
@@ -55,31 +55,5 @@ export class AppleAuthService {
       console.error("Apple token verification error:", error)
       return null
     }
-  }
-
-  /**
-   * Convert JWK to PEM format
-   */
-  private async jwkToPEM(jwk: any): Promise<CryptoKey> {
-    const publicKey = await importSPKI(
-      this.createPEMString(jwk.n, jwk.e),
-      jwk.alg
-    )
-    return publicKey
-  }
-
-  /**
-   * Create PEM string from modulus and exponent
-   */
-  private createPEMString(n: string, e: string): string {
-    // This is a simplified version
-    // In production, use a proper JWK to PEM conversion library
-    const modulus = Buffer.from(n, "base64")
-    const exponent = Buffer.from(e, "base64")
-
-    // RSA public key structure
-    const keyData = Buffer.concat([modulus, exponent])
-
-    return `-----BEGIN PUBLIC KEY-----\n${keyData.toString("base64")}\n-----END PUBLIC KEY-----`
   }
 }

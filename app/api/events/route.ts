@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/auth"
-
+import { getAuthenticatedUser } from "@/lib/auth/jwt"
 import { db } from "@/lib/db"
 import { z } from "zod"
+import { scheduleEventReminder } from "@/lib/jobs/queue"
 
 const eventSchema = z.object({
   title: z.string().min(1),
@@ -44,9 +44,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
+    const user = await getAuthenticatedUser(request)
 
-    if (!session) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -85,6 +85,15 @@ export async function POST(request: NextRequest) {
     })
 
     console.log("Event created successfully:", event.id)
+
+    // Schedule push notification reminders (24h and 1h before)
+    try {
+      await scheduleEventReminder(event.id, event.start, "24h")
+      await scheduleEventReminder(event.id, event.start, "1h")
+    } catch (err) {
+      // Log but don't fail the request if notification scheduling fails
+      console.error("Failed to schedule event reminders:", err)
+    }
 
     return NextResponse.json(event, { status: 201 })
   } catch (error) {

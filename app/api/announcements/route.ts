@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/auth"
-
+import { getAuthUser } from "@/lib/auth-helper"
 import { db } from "@/lib/db"
+import { queueAnnouncementNotification } from "@/lib/jobs/queue"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const user = await getAuthUser(request)
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const announcements = await db.announcement.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -29,9 +35,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
+    const user = await getAuthUser(request)
 
-    if (!session || !session.user?.id) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -50,7 +56,7 @@ export async function POST(request: NextRequest) {
         title,
         content,
         priority: priority || "NORMAL",
-        authorId: session.user.id,
+        authorId: user.id,
       },
       include: {
         author: {
@@ -61,6 +67,16 @@ export async function POST(request: NextRequest) {
         },
       },
     })
+
+    // Send push notification for HIGH or URGENT priority announcements
+    if (priority === "HIGH" || priority === "URGENT") {
+      try {
+        await queueAnnouncementNotification(announcement.id)
+      } catch (err) {
+        // Log but don't fail the request if notification fails
+        console.error("Failed to queue announcement notification:", err)
+      }
+    }
 
     return NextResponse.json(announcement, { status: 201 })
   } catch (error) {

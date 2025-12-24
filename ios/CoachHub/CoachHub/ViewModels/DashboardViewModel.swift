@@ -41,7 +41,7 @@ class DashboardViewModel: ObservableObject {
             upcomingEvents = events.filter { $0.start >= Date() }
                 .sorted { $0.start < $1.start }
         } catch {
-            print("Failed to load events: \(error)")
+            AppLogger.error("Failed to load events: \(error.localizedDescription)", category: .general)
         }
     }
 
@@ -56,7 +56,11 @@ class DashboardViewModel: ObservableObject {
 
         totalPlayers = playerList?.count ?? 0
         totalEvents = eventList?.count ?? 0
-        totalTournaments = tournamentList?.count ?? 0
+
+        // Count only upcoming tournaments (where endDate >= now)
+        let now = Date()
+        totalTournaments = tournamentList?.filter { $0.endDate >= now }.count ?? 0
+
         totalWorkouts = workoutList?.count ?? 0
     }
 }

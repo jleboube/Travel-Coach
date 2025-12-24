@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from "@/auth"
 import { db } from '@/lib/db'
 import { z } from 'zod'
+import { getAuthUser } from '@/lib/auth-helper'
 
 const playerSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -21,8 +21,8 @@ const playerSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session) {
+    const user = await getAuthUser(request)
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -58,6 +58,9 @@ export async function GET(request: NextRequest) {
           orderBy: { date: 'desc' },
           take: 3,
         },
+        performanceMetrics: {
+          orderBy: { date: 'desc' },
+        },
       },
       orderBy: [
         { jerseyNumber: 'asc' },
@@ -65,7 +68,25 @@ export async function GET(request: NextRequest) {
       ],
     })
 
-    return NextResponse.json(players)
+    // Process to get latest performance metrics for each player
+    const playersWithLatestMetrics = players.map(player => {
+      const latestMetrics: Record<string, any> = {}
+      const seenTypes = new Set<string>()
+
+      for (const metric of player.performanceMetrics) {
+        if (!seenTypes.has(metric.type)) {
+          latestMetrics[metric.type] = metric
+          seenTypes.add(metric.type)
+        }
+      }
+
+      return {
+        ...player,
+        latestPerformanceMetrics: latestMetrics,
+      }
+    })
+
+    return NextResponse.json(playersWithLatestMetrics)
   } catch (error) {
     console.error('Error fetching players:', error)
     return NextResponse.json(
@@ -77,8 +98,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session) {
+    const user = await getAuthUser(request)
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -114,6 +135,7 @@ export async function POST(request: NextRequest) {
       include: {
         stats: true,
         customMetrics: true,
+        performanceMetrics: true,
       },
     })
 

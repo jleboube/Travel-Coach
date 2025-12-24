@@ -17,11 +17,6 @@ node_modules/
 # Misc
 .DS_Store
 *.pem
-DEPLOYMENT.md
-PROJECT_SUMMARY.md
-QUICKSTART.md
-travel-coach-prd.md
-AGENTS.md
 
 # Debug
 npm-debug.log*

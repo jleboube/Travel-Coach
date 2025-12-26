@@ -17,8 +17,10 @@ COPY . .
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build application
+# Build application with memory optimization
 ENV NEXT_TELEMETRY_DISABLED 1
+# Limit Node.js heap to 1.5GB to prevent OOM on low-memory VMs
+ENV NODE_OPTIONS="--max-old-space-size=1536"
 RUN npm run build
 
 # Runner stage

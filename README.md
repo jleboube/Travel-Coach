@@ -580,6 +580,53 @@ sudo systemctl restart cloudflared
 3. Verify HTTPS certificate is valid
 4. Check server logs for errors
 
+### Docker build out of memory (OOM)
+
+If you see "JavaScript heap out of memory" during `docker compose up --build`, your VM needs more memory. The Dockerfile is optimized for 2GB+ RAM, but you can add swap space to use disk as virtual memory:
+
+```bash
+# Check current swap
+free -h
+
+# Create 4GB swap file (adjust size as needed)
+sudo fallocate -l 4G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# Make permanent (add to /etc/fstab)
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Verify
+free -h
+```
+
+After adding swap, retry the build:
+
+```bash
+docker compose up -d --build
+```
+
+**Minimum Requirements:**
+- 2GB RAM + 2GB swap (builds slowly but works)
+- 4GB RAM recommended for faster builds
+
+**Alternative: Build Locally, Push Image**
+
+If your VM is resource-constrained, build on your local machine and push to a registry:
+
+```bash
+# Build locally
+docker build -t your-registry/coachhub:latest .
+
+# Push to registry
+docker push your-registry/coachhub:latest
+
+# On VM, pull and run
+docker compose pull
+docker compose up -d
+```
+
 ---
 
 ## Project Structure

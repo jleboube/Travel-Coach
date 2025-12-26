@@ -10,11 +10,15 @@ struct ProfileView: View {
     @StateObject private var authService = AuthService.shared
     @State private var showingDeleteConfirmation = false
     @State private var showingEditProfile = false
+    @State private var showCopiedToast = false
 
     var body: some View {
         NavigationView {
             List {
                 userInfoSection
+                if authService.currentUser?.team != nil {
+                    teamSection
+                }
                 biometricSection
                 aboutSection
                 actionsSection
@@ -41,6 +45,20 @@ struct ProfileView: View {
             .sheet(isPresented: $showingEditProfile) {
                 EditProfileView()
             }
+            .overlay(alignment: .bottom) {
+                if showCopiedToast {
+                    Text("Join code copied!")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.green)
+                        .cornerRadius(8)
+                        .padding(.bottom, 40)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.3), value: showCopiedToast)
         }
     }
 
@@ -90,6 +108,62 @@ struct ProfileView: View {
                 }
             }
             .padding(.vertical, 8)
+        }
+    }
+
+    private var teamSection: some View {
+        Section("Team") {
+            if let team = authService.currentUser?.team {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(team.name)
+                                .font(.headline)
+                            Text(team.season)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Invite Code")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        HStack {
+                            Text(team.joinCode)
+                                .font(.system(.title2, design: .monospaced))
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+
+                            Spacer()
+
+                            Button(action: {
+                                UIPasteboard.general.string = team.joinCode
+                                showCopiedToast = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                    showCopiedToast = false
+                                }
+                            }) {
+                                Image(systemName: "doc.on.doc")
+                                    .font(.title3)
+                                    .foregroundColor(.blue)
+                            }
+
+                            ShareLink(item: "Join my team on Travel-Coach! Use invite code: \(team.joinCode)") {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.title3)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .padding(.vertical, 4)
+            }
         }
     }
 
